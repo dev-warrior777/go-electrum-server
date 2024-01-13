@@ -19,10 +19,11 @@ func NewDB(cfg lib.Config) *DB {
 }
 
 func (d *DB) Open() error {
-	ldb, err := leveldb.OpenFile(db.datadir, nil)
+	ldb, err := leveldb.OpenFile(d.datadir, nil)
 	if err != nil {
 		zap.S().Errorf("%v\n", err)
 		return err
 	}
 	d.db = ldb
+	return nil
 }

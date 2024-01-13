@@ -3,9 +3,12 @@ package main
 // https://pkg.go.dev/github.com/btcsuite/goleveldb
 
 import (
+	"context"
 	"os"
+	"os/signal"
 
 	"github.com/dev-warrior777/go-electrum-server.git/electrumx/lib"
+	"github.com/dev-warrior777/go-electrum-server.git/electrumx/server"
 	"go.uber.org/zap"
 )
 
@@ -16,7 +19,7 @@ func init() {
 }
 
 func main() {
-	zap.L().Info("ElectrumX", zap.String("version", lib.Version()))
+	zap.S().Infof("ElectrumX: version: %s protocol %s", lib.Version(), lib.Protocol())
 
 	// set up config - bitcoin regtest only for now
 	cfg := lib.GetDefaultConfig()
@@ -28,6 +31,18 @@ func main() {
 	cfg.SetCoin(bitcoin)
 
 	// start controller
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer cancel()
+
+	ctl := server.NewController(ctx, cfg)
+	err = ctl.StartServer()
+	if err != nil {
+		zap.S().Errorf("%v\n", err)
+		os.Exit(1)
+	}
+
+	<-ctx.Done()
+	cancel()
 
 	zap.L().Info("exit")
 }
