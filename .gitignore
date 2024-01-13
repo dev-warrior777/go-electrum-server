@@ -22,6 +22,6 @@ go.work
 
 # server binary
 main
-
+    
 # server default data dir for dev
 dbdata/

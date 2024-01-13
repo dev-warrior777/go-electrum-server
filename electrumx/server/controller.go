@@ -8,14 +8,15 @@ import (
 )
 
 type Controller struct {
-	context context.Context
-	config  *lib.Config
+	ctx    context.Context
+	config *lib.Config
+	daemon Daemon
 }
 
 func NewController(ctx context.Context, cfg *lib.Config) *Controller {
 	c := Controller{
-		context: ctx,
-		config:  cfg,
+		ctx:    ctx,
+		config: cfg,
 	}
 	zap.S().Info("new controller")
 	return &c
@@ -24,6 +25,15 @@ func NewController(ctx context.Context, cfg *lib.Config) *Controller {
 // StopServer initailaizes and starts the server
 func (c *Controller) StartServer() error {
 	zap.S().Info("starting server")
+	daemon, err := DaemonForCoin(c.config.GetCoin())
+	if err != nil {
+		return err
+	}
+	c.daemon = daemon
+	zap.S().Infof("daemon tip: %d", c.daemon.Tip())
+
+	genesisBlockHash, _ := c.daemon.GetBlockHash(0)
+	zap.S().Infof("daemon genesis blockhash: %s", genesisBlockHash)
 
 	return nil
 }

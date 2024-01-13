@@ -19,6 +19,6 @@ func (c *Config) SetCoin(coin Coin) error {
 	return nil
 }
 
-func (c *Config) GetCoin() *Coin {
-	return &c.coin
+func (c *Config) GetCoin() Coin {
+	return c.coin
 }
