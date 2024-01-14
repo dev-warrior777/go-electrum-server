@@ -2,7 +2,9 @@ package server
 
 import (
 	"context"
+	"errors"
 
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/dev-warrior777/go-electrum-server.git/electrumx/lib"
 	"go.uber.org/zap"
 )
@@ -22,7 +24,7 @@ func NewController(ctx context.Context, cfg *lib.Config) *Controller {
 	return &c
 }
 
-// StopServer initailaizes and starts the server
+// StartServer initializes and starts the server
 func (c *Controller) StartServer() error {
 	zap.S().Info("starting server")
 	daemon, err := DaemonForCoin(c.config.GetCoin())
@@ -30,10 +32,20 @@ func (c *Controller) StartServer() error {
 		return err
 	}
 	c.daemon = daemon
-	zap.S().Infof("daemon tip: %d", c.daemon.Tip())
-
+	// check daemon genesis
 	genesisBlockHash, _ := c.daemon.GetBlockHash(0)
 	zap.S().Infof("daemon genesis blockhash: %s", genesisBlockHash)
+	params := c.config.GetCoin().GetParams()
+	trueGenesis := params.GenesisHash
+	daemonGenesis, _ := chainhash.NewHashFromStr(genesisBlockHash)
+	if !trueGenesis.IsEqual(daemonGenesis) {
+		zap.S().Errorf("daemon genesis: %s", c.daemon.GetBlockCount())
+		return errors.New("invalid daemon genesis block hash")
+	}
+	zap.S().Infof("daemon has valid genesis for net %s", params.Name)
+	// daemon height
+	blocks := c.daemon.GetBlockCount()
+	zap.S().Infof("daemon blocks: %d", blocks)
 
 	return nil
 }

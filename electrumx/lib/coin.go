@@ -15,8 +15,8 @@ var (
 )
 
 type Coin interface {
+	GetParams() *chaincfg.Params
 	GetDaemonUrl() *DaemonUrl
-	//TODO: more methods
 }
 
 type Bitcoin struct {
@@ -74,4 +74,8 @@ func NewBitcoin(net Net) (Coin, error) {
 
 func (b Bitcoin) GetDaemonUrl() *DaemonUrl {
 	return b.DaemonUrl
+}
+
+func (b Bitcoin) GetParams() *chaincfg.Params {
+	return b.Params
 }

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/dev-warrior777/go-electrum-server.git/electrumx/lib"
+	"go.uber.org/zap"
 )
 
 const defaultDaemonTimeout = 10 * time.Second
@@ -20,11 +21,9 @@ type positional []any
 
 // DaemonClient is an Electrum wallet HTTP JSON-RPC client.
 type DaemonClient struct {
-	reqID      uint64
-	url        string
-	auth       string
-	walletFile string
-
+	reqID uint64
+	url   string
+	auth  string
 	// HTTPClient may be set by the user to a custom http.Client. The
 	// constructor sets a vanilla client.
 	HTTPClient *http.Client
@@ -37,7 +36,7 @@ type DaemonClient struct {
 // authorization information and endpoint. The endpoint should include the
 // protocol, e.g. http://127.0.0.1:4567. To specify a custom http.Client or
 // request timeout, the fields may be set after construction.
-func NewDaemonClient(user, pass, endpoint string) *DaemonClient {
+func NewDaemonClient(endpoint, user, pass string) *DaemonClient {
 	// Prepare the HTTP Basic Authorization request header. This avoids
 	// re-encoding it for every request with (*http.Request).SetBasicAuth.
 	auth := "Basic " + base64.StdEncoding.EncodeToString([]byte(user+":"+pass))
@@ -65,6 +64,7 @@ func (dc *DaemonClient) Call(ctx context.Context, method string, args any, resul
 	if err != nil {
 		return err
 	}
+	// fmt.Println(string(reqMsg))
 
 	bodyReader := bytes.NewReader(reqMsg)
 	ctx, cancel := context.WithTimeout(ctx, dc.Timeout)
@@ -79,6 +79,7 @@ func (dc *DaemonClient) Call(ctx context.Context, method string, args any, resul
 
 	resp, err := dc.HTTPClient.Do(httpReq)
 	if err != nil {
+		zap.S().Errorf("HttpClient.do %v", err)
 		return err
 	}
 	defer resp.Body.Close()
@@ -101,6 +102,15 @@ func (dc *DaemonClient) Call(ctx context.Context, method string, args any, resul
 		return json.Unmarshal(jsonResp.Result, result)
 	}
 	return nil
+}
+
+func (dc *DaemonClient) GetBlockCount(ctx context.Context) (int, error) {
+	var res int
+	err := dc.Call(ctx, "getblockcount", nil, &res)
+	if err != nil {
+		return -1, err
+	}
+	return res, nil
 }
 
 func (dc *DaemonClient) GetBlockHash(ctx context.Context, height int64) (string, error) {
