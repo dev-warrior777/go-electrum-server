@@ -5,9 +5,11 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -120,4 +122,50 @@ func (dc *DaemonClient) GetBlockHash(ctx context.Context, height int64) (string,
 		return "", err
 	}
 	return res, nil
+}
+
+// GetBlockHashes returns 'count' block hashes starting at height 'height'. If
+// If there is less blocks than 'count' whatever blocks left will be returned.
+// The caller should check the returned blockcountcount 'i'
+func (dc *DaemonClient) GetBlockHashes(ctx context.Context, height int64, count int) ([]string, int, error) {
+	var hashes = make([]string, 0, 8)
+	var i int
+	for i = 0; i < count; i++ {
+		var res string
+		err := dc.Call(ctx, "getblockhash", positional{height + int64(i)}, &res)
+		if err != nil {
+			rpcErr, parseErr := parseDaemonError(err)
+			if parseErr != nil {
+				return nil, 0, parseErr
+			}
+			if rpcErr.Code != ERR_BLK_OUT_OF_RANGE {
+				newErr := fmt.Sprintf("invalid error: code %d - %s",
+					rpcErr.Code, rpcErr.Message)
+				return nil, 0, errors.New(newErr)
+			}
+			// return what we can
+			return hashes, i, nil
+		}
+		hashes = append(hashes, res)
+	}
+	return hashes, i, nil
+}
+
+const ERR_BLK_OUT_OF_RANGE = -8
+
+func parseDaemonError(e error) (*lib.RPCError, error) {
+	type ErrRes struct {
+		Result json.RawMessage `json:"result"`
+		Error  *lib.RPCError   `json:"error"`
+		ID     uint64          `json:"id"`
+	}
+	s := e.Error()
+	startIdx := strings.Index(s, "{")
+	js := s[startIdx:]
+	var res ErrRes
+	err := json.Unmarshal([]byte(js), &res)
+	if err != nil {
+		return nil, err
+	}
+	return res.Error, nil
 }

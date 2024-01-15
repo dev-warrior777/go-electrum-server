@@ -14,6 +14,7 @@ import (
 type Daemon interface {
 	GetBlockCount() int64
 	GetBlockHash(height int64) (string, error)
+	GetBlockHashes(height int64, count int) ([]string, int, error)
 }
 
 func DaemonForCoin(coin lib.Coin) (Daemon, error) {
@@ -45,9 +46,17 @@ func (b BtcDaemon) GetBlockCount() int64 {
 }
 
 func (b BtcDaemon) GetBlockHash(height int64) (string, error) {
-	hash, err := b.rpcClient.GetBlockHash(context.Background(), 0)
+	hash, err := b.rpcClient.GetBlockHash(context.Background(), height)
 	if err != nil {
 		return "", err
 	}
 	return hash, nil
+}
+
+func (b BtcDaemon) GetBlockHashes(height int64, count int) ([]string, int, error) {
+	hashes, i, err := b.rpcClient.GetBlockHashes(context.Background(), height, count)
+	if err != nil {
+		return nil, i, err
+	}
+	return hashes, i, nil
 }
