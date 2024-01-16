@@ -34,14 +34,15 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 
-	ctl := server.NewController(ctx, cfg)
-	err = ctl.StartServer()
+	ctl := server.NewController(cfg)
+	err = ctl.StartServer(ctx)
 	if err != nil {
 		zap.S().Errorf("%v\n", err)
 		os.Exit(1)
 	}
 
 	<-ctx.Done()
+	ctl.StopServer()
 	cancel()
 
 	zap.L().Info("exit")

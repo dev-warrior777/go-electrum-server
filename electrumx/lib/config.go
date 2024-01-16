@@ -5,11 +5,13 @@ type Config struct {
 	// server data and database dir
 	Datadir string
 	//
+	PreFetchPollingDelaySecs int
 }
 
 func GetDefaultConfig() *Config {
 	return &Config{
-		Datadir: "datadir",
+		Datadir:                  "datadir",
+		PreFetchPollingDelaySecs: 10,
 	}
 }
 

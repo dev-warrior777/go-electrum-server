@@ -21,17 +21,15 @@ const defaultDaemonTimeout = 10 * time.Second
 
 type positional []any
 
-// DaemonClient is an Electrum wallet HTTP JSON-RPC client.
+// DaemonClient is an Bitcoin & clones HTTP JSON-RPC client.
+// Some methods are used by some coins but the majority are
+// common.
 type DaemonClient struct {
-	reqID uint64
-	url   string
-	auth  string
-	// HTTPClient may be set by the user to a custom http.Client. The
-	// constructor sets a vanilla client.
+	reqID      uint64
+	url        string
+	auth       string
 	HTTPClient *http.Client
-	// Timeout is the timeout on http requests. A 10 second default is set by
-	// the constructor.
-	Timeout time.Duration
+	Timeout    time.Duration
 }
 
 // NewDaemonClient constructs a new Daemon RPC client with the given
@@ -39,8 +37,7 @@ type DaemonClient struct {
 // protocol, e.g. http://127.0.0.1:4567. To specify a custom http.Client or
 // request timeout, the fields may be set after construction.
 func NewDaemonClient(endpoint, user, pass string) *DaemonClient {
-	// Prepare the HTTP Basic Authorization request header. This avoids
-	// re-encoding it for every request with (*http.Request).SetBasicAuth.
+	// Prepare the HTTP Basic Authorization request header.
 	auth := "Basic " + base64.StdEncoding.EncodeToString([]byte(user+":"+pass))
 	return &DaemonClient{
 		url:        endpoint,
@@ -138,7 +135,7 @@ func (dc *DaemonClient) GetBlockHashes(ctx context.Context, height int64, count 
 			if parseErr != nil {
 				return nil, 0, parseErr
 			}
-			if rpcErr.Code != ERR_BLK_OUT_OF_RANGE {
+			if rpcErr.Code != RPC_BLK_OUT_OF_RANGE {
 				newErr := fmt.Sprintf("invalid error: code %d - %s",
 					rpcErr.Code, rpcErr.Message)
 				return nil, 0, errors.New(newErr)
@@ -151,7 +148,38 @@ func (dc *DaemonClient) GetBlockHashes(ctx context.Context, height int64, count 
 	return hashes, i, nil
 }
 
-const ERR_BLK_OUT_OF_RANGE = -8
+type BlockHeader struct {
+}
+type Block struct {
+	Header *BlockHeader
+	//
+}
+
+// GetDeserializedBlock returns a basic block struct.
+func (dc *DaemonClient) GetDeserializedBlock(ctx context.Context, blockHash string) (*Block, error) {
+
+	return nil, errors.New("method not implemented")
+}
+
+func (dc *DaemonClient) GetRawBlocks(ctx context.Context, blockHashes []string) ([]string, error) {
+
+	return nil, errors.New("method not implemented")
+}
+
+func (dc *DaemonClient) GetMempoolHashes(ctx context.Context) ([]string, error) {
+	var hashes = make([]string, 0, 8)
+	err := dc.Call(ctx, "getrawmempool", nil, &hashes)
+	if err != nil {
+		return nil, err
+	}
+	return hashes, nil
+}
+
+const (
+	RPC_BLK_OUT_OF_RANGE = -8
+	RPC_IN_WARMUP        = -28
+	RPC_PARSE_ERROR      = -32700
+)
 
 func parseDaemonError(e error) (*lib.RPCError, error) {
 	type ErrRes struct {

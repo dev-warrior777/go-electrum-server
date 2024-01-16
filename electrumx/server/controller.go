@@ -2,64 +2,75 @@ package server
 
 import (
 	"context"
-	"errors"
+	"time"
 
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/dev-warrior777/go-electrum-server.git/electrumx/lib"
 	"go.uber.org/zap"
 )
 
-type Controller struct {
-	ctx    context.Context
-	config *lib.Config
-	daemon Daemon
+const CONTROLLER_CHK_SECS = 5
+
+// Block and Mempool send notifications on new blocks and new mempool hashes
+type Notifications struct {
 }
 
-func NewController(ctx context.Context, cfg *lib.Config) *Controller {
+// Controller starts and coordinates the ElectrumX server
+type Controller struct {
+	config         *lib.Config
+	daemon         Daemon
+	blockProcessor *BlockProcessor
+	mempool        *Mempool
+	db             *DB
+}
+
+func NewController(cfg *lib.Config) *Controller {
 	c := Controller{
-		ctx:    ctx,
 		config: cfg,
 	}
-	zap.S().Info("new controller")
 	return &c
 }
 
 // StartServer initializes and starts the server
-func (c *Controller) StartServer() error {
+func (c *Controller) StartServer(ctx context.Context) error {
 	zap.S().Info("starting server")
+
 	// make daemon client
 	daemon, err := DaemonForCoin(c.config.GetCoin())
 	if err != nil {
 		return err
 	}
 	c.daemon = daemon
-	// check daemon genesis
-	genesisBlockHash, err := c.daemon.GetBlockHash(0)
-	if err != nil {
-		return err
-	}
-	zap.S().Infof("daemon genesis blockhash: %s", genesisBlockHash)
-	params := c.config.GetCoin().GetParams()
-	trueGenesis := params.GenesisHash
-	daemonGenesis, _ := chainhash.NewHashFromStr(genesisBlockHash)
-	if !trueGenesis.IsEqual(daemonGenesis) {
-		zap.S().Errorf("daemon genesis: %s", c.daemon.GetBlockCount())
-		return errors.New("invalid daemon genesis block hash")
-	}
-	zap.S().Infof("daemon has valid genesis for net %s", params.Name)
-	// daemon height
-	blocks := c.daemon.GetBlockCount()
-	zap.S().Infof("daemon blocks: %d", blocks)
 
-	var fromHeight int64 = 0
-	hashes, i, err := c.daemon.GetBlockHashes(fromHeight, 427)
-	if err != nil {
-		return err
-	}
-	for h := 0; h < i; h++ {
-		zap.S().Infof("daemon block hashes: %d %s", fromHeight+int64(h), hashes[h])
-	}
+	// database
+	c.db = NewDB(c.config)
 
+	// block-processor
+	c.blockProcessor = NewBlockProcessor(c.config, c.daemon, c.db)
+
+	// mempool processor
+	c.mempool = NewMempool(c.config)
+
+	return c.run(ctx)
+}
+
+func (c *Controller) run(ctx context.Context) error {
+
+	go func() {
+		zap.S().Info("controller run")
+
+		for {
+			select {
+			case <-ctx.Done():
+				zap.S().Info("server shutdown in controller run")
+				return
+			case <-time.After(time.Second * CONTROLLER_CHK_SECS):
+				zap.S().Info("controller run - tick")
+			}
+		}
+
+	}()
+
+	zap.S().Info("controller run exit")
 	return nil
 }
 
@@ -67,4 +78,5 @@ func (c *Controller) StartServer() error {
 func (c *Controller) StopServer() {
 	zap.S().Info("stopping server")
 
+	zap.S().Info("server exit")
 }

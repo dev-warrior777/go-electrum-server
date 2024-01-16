@@ -11,7 +11,7 @@ type DB struct {
 	datadir string
 }
 
-func NewDB(cfg lib.Config) *DB {
+func NewDB(cfg *lib.Config) *DB {
 	db := DB{
 		datadir: cfg.Datadir,
 	}
